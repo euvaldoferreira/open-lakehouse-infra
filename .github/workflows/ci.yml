@@ -74,14 +74,21 @@ jobs:
 
       - name: Audit Airflow providers
         run: |
-          # CVEs ignorados: dependências transitivas do Airflow core (flask, FAB, pyjwt, lxml).
-          # Requerem upgrade do apache-airflow para corrigir — tratados em lakehouse-infra/issues.
-          pip-audit -r airflow/requirements.txt \
-            --ignore-vuln CVE-2025-32962 \
-            --ignore-vuln CVE-2025-58065 \
-            --ignore-vuln CVE-2026-27205 \
-            --ignore-vuln PYSEC-2025-183 \
-            --ignore-vuln PYSEC-2026-87
+          # Instala SOMENTE os pacotes listados em airflow/requirements.txt,
+          # sem dependências transitivas (--no-deps). Isso evita que o pip
+          # resolva e instale apache-airflow (core) e suas centenas de deps,
+          # mantendo o escopo no que explicitamente controlamos.
+          python -m venv /tmp/airflow-audit
+          /tmp/airflow-audit/bin/pip install --no-deps -q -r airflow/requirements.txt
+          /tmp/airflow-audit/bin/pip install -q pip-audit
+          # Providers com CVE que exigem major upgrade (incompatível com Airflow 2.9.1):
+          # GHSA-8q28-pw9g-w82c: providers-apache-spark (sem versão de fix disponível)
+          # GHSA-rv5f-ccpm-xjj4: providers-amazon (fix: 9.22.0, major)
+          # GHSA-9r5j-7r2x-rv4g: providers-http   (fix: 6.0.0,  major)
+          /tmp/airflow-audit/bin/pip-audit --local \
+            --ignore-vuln GHSA-8q28-pw9g-w82c \
+            --ignore-vuln GHSA-rv5f-ccpm-xjj4 \
+            --ignore-vuln GHSA-9r5j-7r2x-rv4g
 
       - name: Audit Notebook dependencies
         run: pip-audit -r notebooks/requirements.txt
