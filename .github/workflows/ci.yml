@@ -79,6 +79,7 @@ jobs:
           # resolva e instale apache-airflow (core) e suas centenas de deps,
           # mantendo o escopo no que explicitamente controlamos.
           python -m venv /tmp/airflow-audit
+          /tmp/airflow-audit/bin/pip install --upgrade pip -q
           /tmp/airflow-audit/bin/pip install --no-deps -q -r airflow/requirements.txt
           /tmp/airflow-audit/bin/pip install -q pip-audit
           # Providers com CVE que exigem major upgrade (incompatível com Airflow 2.9.1):

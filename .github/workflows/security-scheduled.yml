@@ -22,6 +22,7 @@ jobs:
       - name: Audit Airflow providers
         run: |
           python -m venv /tmp/airflow-audit
+          /tmp/airflow-audit/bin/pip install --upgrade pip -q
           /tmp/airflow-audit/bin/pip install --no-deps -q -r airflow/requirements.txt
           /tmp/airflow-audit/bin/pip install -q pip-audit
           /tmp/airflow-audit/bin/pip-audit --local \
