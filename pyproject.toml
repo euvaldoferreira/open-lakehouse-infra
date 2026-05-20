@@ -1,0 +1,8 @@
+[tool.bandit]
+# Falsos positivos esperados em configuração de plataforma:
+# B104 — binding 0.0.0.0 em containers é padrão e intencional
+# B105 — hardcoded_password: falso positivo em webserver_config.py (valores vêm de env vars)
+skips = [
+    "B104",  # bind-to-all-interfaces — padrão em containers Docker
+    "B105",  # hardcoded_password_string — falso positivo em configs do Airflow/Superset
+]

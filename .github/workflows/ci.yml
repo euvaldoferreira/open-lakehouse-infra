@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, "feat/**", "fix/**"]
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Validação de YAML — compose files e configurações
+  # ---------------------------------------------------------------------------
+  validate-yaml:
+    name: Validate YAML (yamllint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements-ci.txt
+
+      - name: Lint YAML files
+        run: yamllint infra/ --config-file .yamllint.yml
+
+  # ---------------------------------------------------------------------------
+  # 2. Lint de Dockerfiles — boas práticas e segurança
+  # ---------------------------------------------------------------------------
+  lint-dockerfiles:
+    name: Lint Dockerfiles (hadolint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hadolint/hadolint-action@v3.1.0
+        with:
+          recursive: true
+          config: .hadolint.yaml
+          failure-threshold: error
+
+  # ---------------------------------------------------------------------------
+  # 3. Lint de shell scripts — bugs e armadilhas comuns
+  # ---------------------------------------------------------------------------
+  lint-scripts:
+    name: Lint Shell Scripts (shellcheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run shellcheck
+        uses: ludeeus/action-shellcheck@2.0.0
+        with:
+          severity: warning
+          scandir: .
+
+  # ---------------------------------------------------------------------------
+  # 4. Auditoria de dependências Python — CVEs nos providers do Airflow
+  #    Escopo: airflow/requirements.txt (único arquivo com versões pinadas).
+  #    notebooks/requirements.txt e notebooks/runner/requirements.txt
+  #    precisam ter versões pinadas antes de serem incluídos aqui.
+  # ---------------------------------------------------------------------------
+  security-audit:
+    name: Security Audit (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements-ci.txt
+
+      - name: Audit Airflow providers
+        run: pip-audit -r airflow/requirements.txt
+
+  # ---------------------------------------------------------------------------
+  # 5. SAST — análise estática em scripts Python de configuração
+  #    Threshold: somente severidade MEDIUM e acima (-ll)
+  #    Falsos positivos configurados em pyproject.toml
+  # ---------------------------------------------------------------------------
+  sast:
+    name: SAST (bandit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements-ci.txt
+
+      - name: Run bandit
+        run: |
+          bandit -r \
+            airflow/webserver_config.py \
+            superset/superset_config.py \
+            notebooks/runner/main.py \
+            notebooks/jupyter_server_config.py \
+            -ll -c pyproject.toml

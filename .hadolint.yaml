@@ -1,0 +1,4 @@
+ignore:
+  - DL3008  # apt-get sem versão pinada — plataforma de desenvolvimento, não produção
+  - DL3006  # conda sem versão — controlado pela imagem base jupyter
+  - DL3013  # pip sem versão — dependências pinadas em requirements.txt separados
