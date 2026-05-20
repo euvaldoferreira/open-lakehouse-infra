@@ -1,6 +1,12 @@
 version: 2
 updates:
-  # Providers do Airflow — arquivo com versões pinadas, auditável
+  # ---------------------------------------------------------------------------
+  # Providers do Airflow — atualizações de minor/patch apenas
+  # Major bloqueado: providers precisam ser testados com Airflow 2.9.1
+  # great-expectations e pyspark ignorados completamente:
+  #   - great-expectations 1.x é reescrita total da API
+  #   - pyspark deve permanecer alinhado com a imagem apache/spark:3.5.1
+  # ---------------------------------------------------------------------------
   - package-ecosystem: pip
     directory: /airflow
     schedule:
@@ -13,8 +19,69 @@ updates:
       - dependencies
     commit-message:
       prefix: "chore(deps)"
+    ignore:
+      - dependency-name: "great-expectations"
+      - dependency-name: "pyspark"
+      - dependency-name: "apache-airflow-providers-*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "pandas"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "pyarrow"
+        update-types: ["version-update:semver-major"]
 
-  # Ferramentas de CI
+  # ---------------------------------------------------------------------------
+  # Dependências do JupyterLab — minor/patch apenas para libs de dados
+  # great-expectations ignorado: 1.x quebra todos os notebooks existentes
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: pip
+    directory: /notebooks
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+    commit-message:
+      prefix: "chore(deps)"
+    ignore:
+      - dependency-name: "great-expectations"
+      - dependency-name: "pandas"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "pyarrow"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "sqlalchemy"
+        update-types: ["version-update:semver-major"]
+
+  # ---------------------------------------------------------------------------
+  # Notebook runner — minor/patch apenas para libs compartilhadas com Airflow
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: pip
+    directory: /notebooks/runner
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+    commit-message:
+      prefix: "chore(deps)"
+    ignore:
+      - dependency-name: "fastapi"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "pandas"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "pyarrow"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "sqlalchemy"
+        update-types: ["version-update:semver-major"]
+
+  # ---------------------------------------------------------------------------
+  # Ferramentas de CI — todas as atualizações permitidas (sem runtime)
+  # ---------------------------------------------------------------------------
   - package-ecosystem: pip
     directory: /
     schedule:
@@ -28,6 +95,9 @@ updates:
     commit-message:
       prefix: "chore(deps)"
 
+  # ---------------------------------------------------------------------------
+  # GitHub Actions — todas as atualizações permitidas
+  # ---------------------------------------------------------------------------
   - package-ecosystem: github-actions
     directory: /
     schedule:

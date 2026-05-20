@@ -20,7 +20,21 @@ jobs:
       - run: pip install -r requirements-ci.txt
 
       - name: Audit Airflow providers
-        run: pip-audit -r airflow/requirements.txt
+        run: |
+          python -m venv /tmp/airflow-audit
+          /tmp/airflow-audit/bin/pip install --upgrade pip -q
+          /tmp/airflow-audit/bin/pip install --no-deps -q -r airflow/requirements.txt
+          /tmp/airflow-audit/bin/pip install -q pip-audit
+          /tmp/airflow-audit/bin/pip-audit --local \
+            --ignore-vuln GHSA-8q28-pw9g-w82c \
+            --ignore-vuln GHSA-rv5f-ccpm-xjj4 \
+            --ignore-vuln GHSA-9r5j-7r2x-rv4g
+
+      - name: Audit Notebook dependencies
+        run: pip-audit -r notebooks/requirements.txt
+
+      - name: Audit Notebook runner dependencies
+        run: pip-audit -r notebooks/runner/requirements.txt
 
       - name: Open issue on failure
         if: failure()

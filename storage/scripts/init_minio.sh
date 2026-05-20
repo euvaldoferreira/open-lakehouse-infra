@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # =============================================================================
 # MinIO Initialization Script
 # Creates buckets, sets versioning, and configures policies
