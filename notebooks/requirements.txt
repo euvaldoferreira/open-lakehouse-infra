@@ -1,6 +1,6 @@
 papermill==2.7.0
 boto3==1.34.69
-minio==7.2.7
+minio==7.2.20
 pandas==2.2.1
 pyarrow==24.0.0
 matplotlib==3.10.9
