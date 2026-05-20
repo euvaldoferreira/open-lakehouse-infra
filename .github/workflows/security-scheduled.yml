@@ -1,0 +1,87 @@
+name: Scheduled Security Scan
+
+on:
+  schedule:
+    - cron: "0 8 * * 1"  # toda segunda-feira às 08h (UTC)
+  workflow_dispatch:       # permite execução manual
+
+jobs:
+  audit-airflow:
+    name: Audit Airflow Providers (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements-ci.txt
+
+      - name: Audit Airflow providers
+        run: pip-audit -r airflow/requirements.txt
+
+      - name: Open issue on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `[Security] CVE detectado em airflow/requirements.txt — ${new Date().toISOString().slice(0, 10)}`;
+            const body = `O scan semanal detectou uma ou mais vulnerabilidades nos providers do Airflow.\n\n` +
+                         `**Workflow:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n\n` +
+                         `Verifique o log e atualize as versões afetadas em \`airflow/requirements.txt\` e na imagem Docker.`;
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: ['security']
+            });
+            const alreadyOpen = issues.some(i => i.title.startsWith('[Security] CVE detectado'));
+            if (!alreadyOpen) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['security']
+              });
+            }
+
+  audit-ci-tools:
+    name: Audit CI Tools (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements-ci.txt
+
+      - name: Audit CI tools
+        run: pip-audit -r requirements-ci.txt
+
+  sast:
+    name: SAST (bandit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements-ci.txt
+
+      - name: Run bandit
+        run: |
+          bandit -r \
+            airflow/webserver_config.py \
+            superset/superset_config.py \
+            notebooks/runner/main.py \
+            notebooks/jupyter_server_config.py \
+            -ll -c pyproject.toml
