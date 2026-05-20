@@ -1,0 +1,132 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ranger-admin
+  namespace: lakehouse
+  labels:
+    app: ranger-admin
+    app.kubernetes.io/part-of: lakehouse-security
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ranger-admin
+  template:
+    metadata:
+      labels:
+        app: ranger-admin
+        app.kubernetes.io/part-of: lakehouse-security
+    spec:
+      initContainers:
+        - name: wait-for-postgres
+          image: postgres:15.6-alpine
+          command:
+            - sh
+            - -c
+            - until pg_isready -h postgres -p 5432 -U postgres; do echo "Waiting for PostgreSQL..."; sleep 5; done
+        - name: wait-for-solr
+          image: curlimages/curl:8.8.0
+          command:
+            - sh
+            - -c
+            - until curl -sf http://solr:8983/solr/; do echo "Waiting for Solr..."; sleep 5; done
+      containers:
+        - name: ranger-admin
+          # Imagem customizada — build a partir de platform/ranger/Dockerfile
+          # Publicar no seu registry antes de usar em K8s:
+          #   docker build -t myregistry/ranger-admin:2.5.0 platform/ranger/
+          #   docker push myregistry/ranger-admin:2.5.0
+          image: lakehouse/ranger-admin:2.5.0
+          ports:
+            - containerPort: 6080
+              name: http
+          env:
+            - name: DB_HOST
+              value: "postgres"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_ROOT_USER
+              value: "airflow_user"
+            - name: DB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ranger-secret
+                  key: db-root-password
+            - name: DB_NAME
+              value: "ranger_db"
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: ranger-secret
+                  key: db-username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ranger-secret
+                  key: db-password
+            - name: RANGER_ADMIN_USER
+              value: "admin"
+            - name: RANGER_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ranger-secret
+                  key: admin-password
+            - name: AUDIT_SOLR_HOST
+              value: "solr"
+            - name: AUDIT_SOLR_PORT
+              value: "8983"
+            - name: POLICY_MGR_URL
+              value: "http://ranger-admin:6080"
+          volumeMounts:
+            - name: ranger-data
+              mountPath: /opt/ranger-admin/.installed
+              subPath: .installed
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          livenessProbe:
+            httpGet:
+              path: /login.jsp
+              port: 6080
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            timeoutSeconds: 15
+            failureThreshold: 10
+          readinessProbe:
+            httpGet:
+              path: /login.jsp
+              port: 6080
+            initialDelaySeconds: 90
+            periodSeconds: 20
+            timeoutSeconds: 15
+      volumes:
+        - name: ranger-data
+          persistentVolumeClaim:
+            claimName: ranger-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ranger-pvc
+  namespace: lakehouse
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ranger-secret
+  namespace: lakehouse
+type: Opaque
+stringData:
+  db-root-password: airflow_secure_pass_2024
+  db-username: ranger_user
+  db-password: ranger_pass_2024
+  admin-password: "rangerR0cks!"

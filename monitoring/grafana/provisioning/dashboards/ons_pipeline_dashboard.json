@@ -1,0 +1,242 @@
+{
+  "__inputs": [],
+  "__requires": [
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "10.4.0" },
+    { "type": "datasource", "id": "postgres", "name": "PostgreSQL", "version": "1.0.0" },
+    { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" }
+  ],
+  "annotations": { "list": [] },
+  "description": "ONS Energy Domain — Pipeline operational monitoring. Shows ingestion health, DQ results and row counts from lakehouse.pipeline_audit and lakehouse.dq_results.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "postgres", "uid": "lakehouse-postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "green", "value": 1 }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Última Ingestão ONS",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "lakehouse-postgres" },
+          "format": "table",
+          "rawSql": "SELECT last_date::text AS \"Última data\" FROM lakehouse.ons_checkpoint WHERE dataset = 'carga_energia_hora' LIMIT 1",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "lakehouse-postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 80 },
+              { "color": "red", "value": 95 }
+            ]
+          },
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+      "id": 2,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Taxa de Aprovação DQ (7d)",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "lakehouse-postgres" },
+          "format": "table",
+          "rawSql": "SELECT ROUND(100.0 * COUNT(*) FILTER (WHERE status = 'passed') / NULLIF(COUNT(*), 0), 1) AS \"% DQ Passed\" FROM lakehouse.dq_results WHERE dag_id LIKE 'ons_%' AND created_at >= NOW() - INTERVAL '7 days'",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "lakehouse-postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 3 }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+      "id": 3,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Falhas ONS (24h)",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "lakehouse-postgres" },
+          "format": "table",
+          "rawSql": "SELECT COUNT(*) AS \"Falhas\" FROM lakehouse.pipeline_audit WHERE dag_id LIKE 'ons_%' AND status = 'failed' AND started_at >= NOW() - INTERVAL '24 hours'",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "lakehouse-postgres" },
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 0 },
+      "id": 4,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Linhas Ingeridas (última execução)",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "lakehouse-postgres" },
+          "format": "table",
+          "rawSql": "SELECT row_count AS \"Registros\" FROM lakehouse.pipeline_audit WHERE dag_id = 'ons_dag_01_raw_ingestion' ORDER BY started_at DESC LIMIT 1",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "lakehouse-postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 9, "w": 16, "x": 0, "y": 4 },
+      "id": 5,
+      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "list", "placement": "bottom" } },
+      "title": "Registros por Camada (últimos 14 dias)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "lakehouse-postgres" },
+          "format": "time_series",
+          "rawSql": "SELECT date_trunc('day', started_at) AS time, layer, SUM(row_count) AS \"Registros\" FROM lakehouse.pipeline_audit WHERE dag_id LIKE 'ons_%' AND started_at >= NOW() - INTERVAL '14 days' AND row_count IS NOT NULL GROUP BY 1, 2 ORDER BY 1",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "lakehouse-postgres" },
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "status" }, "properties": [{ "id": "custom.width", "value": 80 }] },
+          { "matcher": { "id": "byName", "options": "dag_id" }, "properties": [{ "id": "custom.width", "value": 240 }] }
+        ]
+      },
+      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 4 },
+      "id": 6,
+      "options": { "showHeader": true, "sortBy": [{ "desc": true, "displayName": "started_at" }] },
+      "title": "Execuções Recentes",
+      "type": "table",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "lakehouse-postgres" },
+          "format": "table",
+          "rawSql": "SELECT dag_id, layer, status, row_count, to_char(started_at, 'YYYY-MM-DD HH24:MI') AS started_at, notes FROM lakehouse.pipeline_audit WHERE dag_id LIKE 'ons_%' ORDER BY started_at DESC LIMIT 20",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "lakehouse-postgres" },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "displayMode": "color-background" } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "status" }, "properties": [
+            { "id": "custom.width", "value": 90 },
+            { "id": "mappings", "value": [
+              { "type": "value", "options": { "passed": { "color": "green", "index": 0 } } },
+              { "type": "value", "options": { "failed": { "color": "red", "index": 1 } } },
+              { "type": "value", "options": { "warning": { "color": "yellow", "index": 2 } } }
+            ]}
+          ]}
+        ]
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 13 },
+      "id": 7,
+      "options": { "showHeader": true },
+      "title": "Resultados de Qualidade (últimos 7 dias)",
+      "type": "table",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "lakehouse-postgres" },
+          "format": "table",
+          "rawSql": "SELECT to_char(run_date, 'YYYY-MM-DD') AS data, check_name AS \"Verificação\", status AS \"Status\", issue_count AS \"Problemas\", details::text AS \"Detalhes\" FROM lakehouse.dq_results WHERE dag_id LIKE 'ons_%' AND created_at >= NOW() - INTERVAL '7 days' ORDER BY run_date DESC, check_name",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2 },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 21 },
+      "id": 8,
+      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "list", "placement": "bottom" } },
+      "title": "Falhas de DAG ONS — Prometheus",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "increase(airflow_dag_run_failed_total{dag_id=~\"ons_dag.*\"}[1h])",
+          "legendFormat": "{{ dag_id }}",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "refresh": "5m",
+  "schemaVersion": 39,
+  "tags": ["ons", "energia", "pipeline", "monitoring"],
+  "templating": { "list": [] },
+  "time": { "from": "now-7d", "to": "now" },
+  "timepicker": {},
+  "timezone": "America/Sao_Paulo",
+  "title": "ONS — Pipeline Energético",
+  "uid": "ons-energy-pipeline",
+  "version": 1
+}

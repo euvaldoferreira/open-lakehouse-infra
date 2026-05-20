@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+papermill
+ipykernel
+nbformat
+boto3
+pandas
+pyarrow
+minio
+sqlalchemy

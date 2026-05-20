@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ranger-admin
+  namespace: lakehouse
+  labels:
+    app: ranger-admin
+    app.kubernetes.io/part-of: lakehouse-security
+spec:
+  selector:
+    app: ranger-admin
+  ports:
+    - name: http
+      port: 6080
+      targetPort: 6080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ranger-ingress
+  namespace: lakehouse
+spec:
+  rules:
+    - host: ranger.lakehouse.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ranger-admin
+                port:
+                  number: 6080

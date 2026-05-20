@@ -1,0 +1,39 @@
+{
+  "name": "lakehouse-postgres-cdc",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "tasks.max": "1",
+
+    "database.hostname": "postgres",
+    "database.port": "5432",
+    "database.user": "debezium_user",
+    "database.password": "debezium_pass_2024",
+    "database.dbname": "airflow_db",
+
+    "topic.prefix": "cdc.postgres",
+    "plugin.name": "pgoutput",
+    "slot.name": "debezium_slot",
+    "publication.name": "dbz_publication",
+    "publication.autocreate.mode": "filtered",
+
+    "table.include.list": "lakehouse.pipeline_audit,lakehouse.dq_results",
+
+    "snapshot.mode": "initial",
+    "snapshot.locking.mode": "none",
+
+    "heartbeat.interval.ms": "30000",
+    "heartbeat.topics.prefix": "debezium.heartbeat",
+
+    "decimal.handling.mode": "double",
+    "time.precision.mode": "connect",
+    "timestamp.timezone.provider": "local",
+
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter.schemas.enable": "false",
+
+    "tombstones.on.delete": "true",
+    "after.state.only": "false"
+  }
+}

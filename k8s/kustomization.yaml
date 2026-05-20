@@ -1,0 +1,36 @@
+# =============================================================================
+# Kustomize - Lakehouse Platform (Kubernetes)
+#
+# Uso:
+#   kubectl apply -k platform/k8s/              # aplica tudo
+#   kubectl apply -k platform/k8s/streaming/    # só streaming
+#   kubectl apply -k platform/k8s/security/     # só security
+# =============================================================================
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: lakehouse
+
+resources:
+  # --- Namespace ---
+  - namespaces/lakehouse-ns.yaml
+
+  # --- Streaming (Kafka + Debezium) ---
+  - streaming/kafka-configmap.yaml
+  - streaming/kafka-statefulset.yaml
+  - streaming/kafka-service.yaml
+  - streaming/debezium-deployment.yaml
+  - streaming/debezium-service.yaml
+
+  # --- Security (Keycloak + Solr + Ranger) ---
+  - security/keycloak-deployment.yaml
+  - security/keycloak-service.yaml
+  - security/solr-deployment.yaml
+  - security/solr-service.yaml
+  - security/ranger-deployment.yaml
+  - security/ranger-service.yaml
+
+commonLabels:
+  app.kubernetes.io/part-of: lakehouse-platform
+  app.kubernetes.io/managed-by: kustomize

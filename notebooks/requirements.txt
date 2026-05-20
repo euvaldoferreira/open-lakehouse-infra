@@ -1,0 +1,14 @@
+papermill
+boto3
+minio
+pandas
+pyarrow
+matplotlib
+seaborn
+plotly
+ipywidgets
+jupyterlab-git
+nbstripout
+great-expectations
+psycopg2-binary
+sqlalchemy

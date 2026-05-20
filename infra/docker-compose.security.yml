@@ -1,0 +1,186 @@
+# =============================================================================
+# BIGDATA LAKEHOUSE PLATFORM - Security Stack
+# Keycloak (IAM/SSO) + Apache Ranger (AuthZ) + Solr (Audit)
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.security.yml up -d
+#   docker compose -f docker-compose.yml -f docker-compose.security.yml down
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # KEYCLOAK - Identity and Access Management (SSO/OIDC)
+  # Integra com: Airflow, Trino, Superset, Grafana, OpenMetadata
+  # ---------------------------------------------------------------------------
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: lakehouse-keycloak
+    env_file: .env
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/${KEYCLOAK_DB_NAME:-keycloak_db}
+      KC_DB_USERNAME: ${KEYCLOAK_DB_USER:-keycloak_user}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak_pass_2024}
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_PORT: ${KEYCLOAK_PORT:-8180}
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_PORT: "8080"
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-keycloak_admin_2024}
+    command:
+      - start-dev
+      - --import-realm
+    volumes:
+      - ../keycloak/realm-lakehouse.json:/opt/keycloak/data/import/realm-lakehouse.json:ro
+      - keycloak_data:/opt/keycloak/data
+    ports:
+      - "${KEYCLOAK_PORT:-8180}:8080"
+    networks:
+      - frontend_network
+      - backend_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: ${KEYCLOAK_MEM_LIMIT:-1g}
+    security_opt:
+      - no-new-privileges:true
+
+  # ---------------------------------------------------------------------------
+  # SOLR - Backend de auditoria do Apache Ranger
+  # ---------------------------------------------------------------------------
+  solr:
+    image: solr:8.11
+    container_name: lakehouse-solr
+    env_file: .env
+    environment:
+      SOLR_JAVA_MEM: "-Xms256m -Xmx512m"
+    command:
+      - solr-precreate
+      - ranger_audits
+    volumes:
+      - solr_data:/var/solr
+    ports:
+      - "${SOLR_PORT:-8983}:8983"
+    networks:
+      - backend_network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8983/solr/ranger_audits/admin/ping || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: ${SOLR_MEM_LIMIT:-512m}
+    security_opt:
+      - no-new-privileges:true
+
+  # ---------------------------------------------------------------------------
+  # AIRFLOW WEBSERVER — override: ativa Keycloak OIDC quando security stack sobe
+  # ---------------------------------------------------------------------------
+  airflow-webserver:
+    environment:
+      AIRFLOW_AUTH_TYPE: AUTH_OAUTH
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: lakehouse
+      KEYCLOAK_AIRFLOW_CLIENT_ID: airflow
+      KEYCLOAK_AIRFLOW_CLIENT_SECRET: ${KEYCLOAK_AIRFLOW_CLIENT_SECRET}
+    depends_on:
+      keycloak:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # TRINO — override: monta config com JWT auth via Keycloak
+  # ---------------------------------------------------------------------------
+  trino:
+    volumes:
+      - ../trino/etc:/etc/trino:ro
+      - ../trino/etc-security/config.properties:/etc/trino/config.properties:ro
+    depends_on:
+      keycloak:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # RANGER ADMIN - Policy Manager (AuthZ para Trino, Hive, MinIO)
+  # ---------------------------------------------------------------------------
+  ranger-admin:
+    build:
+      context: ../ranger
+      dockerfile: Dockerfile
+    container_name: lakehouse-ranger-admin
+    env_file: .env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_ROOT_USER: ${POSTGRES_USER}
+      DB_ROOT_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${RANGER_DB_NAME:-ranger_db}
+      DB_USER: ${RANGER_DB_USER:-ranger_user}
+      DB_PASSWORD: ${RANGER_DB_PASSWORD:-ranger_pass_2024}
+      RANGER_ADMIN_USER: ${RANGER_ADMIN_USER:-admin}
+      RANGER_ADMIN_PASSWORD: ${RANGER_ADMIN_PASSWORD:-rangerR0cks!}
+      AUDIT_SOLR_HOST: solr
+      AUDIT_SOLR_PORT: "8983"
+      POLICY_MGR_URL: http://ranger-admin:6080
+    ports:
+      - "${RANGER_PORT:-6080}:6080"
+    networks:
+      - frontend_network
+      - backend_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      solr:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:6080/login.jsp || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 10
+      start_period: 120s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: ${RANGER_ADMIN_MEM_LIMIT:-1g}
+    security_opt:
+      - no-new-privileges:true
+
+# =============================================================================
+# NETWORKS (externas, definidas no docker-compose.yml base)
+# =============================================================================
+
+networks:
+  frontend_network:
+    external: true
+    name: lakehouse_frontend
+  backend_network:
+    external: true
+    name: lakehouse_backend
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+
+volumes:
+  keycloak_data:
+    name: lakehouse_keycloak_data
+  solr_data:
+    name: lakehouse_solr_data

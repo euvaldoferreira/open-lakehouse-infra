@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: lakehouse
+  labels:
+    app: keycloak
+    app.kubernetes.io/part-of: lakehouse-security
+spec:
+  selector:
+    app: keycloak
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+# Ingress para acesso externo (ajuste o host conforme seu cluster)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: keycloak-ingress
+  namespace: lakehouse
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "128k"
+spec:
+  rules:
+    - host: keycloak.lakehouse.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: keycloak
+                port:
+                  number: 8080

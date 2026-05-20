@@ -1,0 +1,195 @@
+# =============================================================================
+# BIGDATA LAKEHOUSE PLATFORM - Streaming Stack
+# Kafka (KRaft) + Kafka UI + Debezium (CDC)
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.streaming.yml up -d
+#   docker compose -f docker-compose.yml -f docker-compose.streaming.yml down
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # KAFKA - Distributed Streaming Platform (KRaft mode, sem Zookeeper)
+  # ---------------------------------------------------------------------------
+  kafka:
+    image: apache/kafka:3.8.0
+    container_name: lakehouse-kafka
+    env_file: .env
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://kafka:9092,CONTROLLER://kafka:9093,EXTERNAL://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:${KAFKA_BROKER_PORT:-29092}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    ports:
+      - "${KAFKA_BROKER_PORT:-29092}:29092"
+    networks:
+      - backend_network
+      - data_network
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 2>/dev/null || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: ${KAFKA_MEM_LIMIT:-1g}
+    security_opt:
+      - no-new-privileges:true
+
+  # ---------------------------------------------------------------------------
+  # KAFKA INIT - Cria topics padrão da plataforma
+  # ---------------------------------------------------------------------------
+  kafka-init:
+    image: apache/kafka:3.8.0
+    container_name: lakehouse-kafka-init
+    env_file: .env
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    depends_on:
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ../kafka/kafka-init.sh:/init.sh:ro
+    entrypoint: ["/bin/bash", "/init.sh"]
+    networks:
+      - backend_network
+    restart: on-failure
+
+  # ---------------------------------------------------------------------------
+  # KAFKA UI - Interface Web (Provectus)
+  # ---------------------------------------------------------------------------
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    container_name: lakehouse-kafka-ui
+    env_file: .env
+    environment:
+      KAFKA_CLUSTERS_0_NAME: lakehouse
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      SERVER_SERVLET_CONTEXT_PATH: /
+    ports:
+      - "${KAFKA_UI_PORT:-8090}:8080"
+    networks:
+      - frontend_network
+      - backend_network
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: ${KAFKA_UI_MEM_LIMIT:-512m}
+    security_opt:
+      - no-new-privileges:true
+
+  # ---------------------------------------------------------------------------
+  # DEBEZIUM - Kafka Connect com plugins CDC (Change Data Capture)
+  # ---------------------------------------------------------------------------
+  debezium:
+    image: debezium/connect:2.7
+    container_name: lakehouse-debezium
+    env_file: .env
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: lakehouse-debezium
+      CONFIG_STORAGE_TOPIC: debezium.configs
+      OFFSET_STORAGE_TOPIC: debezium.offsets
+      STATUS_STORAGE_TOPIC: debezium.statuses
+      CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      STATUS_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_REST_ADVERTISED_HOST_NAME: debezium
+      CONNECT_REST_PORT: 8083
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+    ports:
+      - "${DEBEZIUM_PORT:-8083}:8083"
+    networks:
+      - backend_network
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/connectors"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: ${DEBEZIUM_MEM_LIMIT:-1g}
+    security_opt:
+      - no-new-privileges:true
+
+  # ---------------------------------------------------------------------------
+  # DEBEZIUM INIT - Registra conectores CDC
+  # ---------------------------------------------------------------------------
+  debezium-init:
+    image: curlimages/curl:8.8.0
+    container_name: lakehouse-debezium-init
+    env_file: .env
+    environment:
+      DEBEZIUM_URL: http://debezium:8083
+    depends_on:
+      debezium:
+        condition: service_healthy
+    volumes:
+      - ../debezium/register-connectors.sh:/register.sh:ro
+      - ../debezium/connectors:/connectors:ro
+    entrypoint: ["/bin/sh", "/register.sh"]
+    networks:
+      - backend_network
+    restart: on-failure
+
+# =============================================================================
+# NETWORKS (externas, definidas no docker-compose.yml base)
+# =============================================================================
+
+networks:
+  frontend_network:
+    external: true
+    name: lakehouse_frontend
+  backend_network:
+    external: true
+    name: lakehouse_backend
+  data_network:
+    external: true
+    name: lakehouse_data
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+
+volumes:
+  kafka_data:
+    name: lakehouse_kafka_data

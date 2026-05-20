@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: solr
+  namespace: lakehouse
+  labels:
+    app: solr
+    app.kubernetes.io/part-of: lakehouse-security
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: solr
+  template:
+    metadata:
+      labels:
+        app: solr
+        app.kubernetes.io/part-of: lakehouse-security
+    spec:
+      containers:
+        - name: solr
+          image: solr:8.11
+          args: ["solr-precreate", "ranger_audits"]
+          ports:
+            - containerPort: 8983
+              name: http
+          env:
+            - name: SOLR_JAVA_MEM
+              value: "-Xms256m -Xmx512m"
+          volumeMounts:
+            - name: solr-data
+              mountPath: /var/solr
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /solr/ranger_audits/admin/ping
+              port: 8983
+            initialDelaySeconds: 45
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /solr/ranger_audits/admin/ping
+              port: 8983
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 10
+      volumes:
+        - name: solr-data
+          persistentVolumeClaim:
+            claimName: solr-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: solr-pvc
+  namespace: lakehouse
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 10Gi

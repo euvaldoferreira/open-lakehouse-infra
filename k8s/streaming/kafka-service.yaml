@@ -1,0 +1,38 @@
+---
+# Service headless para StatefulSet (DNS interno por pod)
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-headless
+  namespace: lakehouse
+  labels:
+    app: kafka
+    app.kubernetes.io/part-of: lakehouse-streaming
+spec:
+  clusterIP: None
+  selector:
+    app: kafka
+  ports:
+    - name: broker
+      port: 9092
+      targetPort: 9092
+    - name: controller
+      port: 9093
+      targetPort: 9093
+---
+# Service ClusterIP para acesso interno
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  namespace: lakehouse
+  labels:
+    app: kafka
+    app.kubernetes.io/part-of: lakehouse-streaming
+spec:
+  selector:
+    app: kafka
+  ports:
+    - name: broker
+      port: 9092
+      targetPort: 9092

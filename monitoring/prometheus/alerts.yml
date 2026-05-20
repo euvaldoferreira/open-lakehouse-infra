@@ -1,0 +1,152 @@
+# =============================================================================
+# Prometheus Alert Rules - Lakehouse Platform
+# =============================================================================
+
+groups:
+
+  # ---------------------------------------------------------------------------
+  # Disponibilidade de serviços críticos
+  # ---------------------------------------------------------------------------
+  - name: service_availability
+    interval: 30s
+    rules:
+
+      - alert: ServiceDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Serviço {{ $labels.job }} está fora do ar"
+          description: >
+            O target {{ $labels.instance }} (job: {{ $labels.job }}) não
+            responde há mais de 2 minutos.
+
+      - alert: PostgreSQLDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL inacessível"
+          description: >
+            PostgreSQL está fora do ar. Airflow, HMS, Superset e OpenMetadata
+            dependem dele — impacto total na plataforma.
+
+      - alert: SparkMasterDown
+        expr: up{job="spark-master"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Spark Master fora do ar"
+          description: >
+            O Spark Master não responde há {{ $value }} minutos.
+            Nenhum job Spark pode ser submetido.
+
+  # ---------------------------------------------------------------------------
+  # Airflow — scheduler lag e falhas
+  # ---------------------------------------------------------------------------
+  - name: airflow
+    interval: 60s
+    rules:
+
+      - alert: AirflowSchedulerUnhealthy
+        expr: up{job="airflow"} == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Airflow Scheduler/Webserver inacessível"
+          description: >
+            O endpoint de métricas do Airflow não está respondendo há 3 minutos.
+            Nenhum DAG será agendado.
+
+      - alert: AirflowDAGFailureHigh
+        expr: >
+          increase(airflow_dag_run_failed_total[30m]) > 3
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Muitas falhas de DAG nos últimos 30 minutos"
+          description: >
+            {{ $value }} execuções de DAG falharam nos últimos 30 minutos.
+            Verifique os logs do Airflow Scheduler.
+
+  # ---------------------------------------------------------------------------
+  # MinIO — espaço em disco e disponibilidade
+  # ---------------------------------------------------------------------------
+  - name: minio
+    interval: 60s
+    rules:
+
+      - alert: MinIODiskUsageHigh
+        expr: >
+          minio_cluster_capacity_usable_free_bytes /
+          minio_cluster_capacity_usable_total_bytes < 0.20
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MinIO com menos de 20% de espaço livre"
+          description: >
+            O cluster MinIO está com {{ printf "%.1f" (mul (sub 1 $value) 100) }}%
+            de uso. Risco de falha de ingestão ao atingir 100%.
+
+      - alert: MinIODiskUsageCritical
+        expr: >
+          minio_cluster_capacity_usable_free_bytes /
+          minio_cluster_capacity_usable_total_bytes < 0.05
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MinIO com menos de 5% de espaço livre (crítico)"
+          description: >
+            O cluster MinIO está com menos de 5% de espaço livre.
+            Escritas vão falhar imediatamente — intervenção urgente necessária.
+
+      - alert: MinIODown
+        expr: up{job="minio"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MinIO inacessível"
+          description: >
+            MinIO não responde. Todos os jobs de ingestão, Spark e Trino
+            estão bloqueados.
+
+  # ---------------------------------------------------------------------------
+  # Spark — workers e memória
+  # ---------------------------------------------------------------------------
+  - name: spark
+    interval: 60s
+    rules:
+
+      - alert: SparkNoWorkers
+        expr: >
+          spark_workers_alive{job="spark-master"} == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Nenhum Spark Worker disponível"
+          description: >
+            O Spark Master não tem workers vivos há 3 minutos.
+            Nenhum job será executado.
+
+      - alert: SparkWorkerMemoryHigh
+        expr: >
+          spark_worker_memory_used_bytes /
+          spark_worker_memory_total_bytes > 0.90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Spark Worker com uso de memória acima de 90%"
+          description: >
+            O worker {{ $labels.instance }} está usando
+            {{ printf "%.1f" (mul $value 100) }}% da memória.
+            Risco de OOM e falha de job.

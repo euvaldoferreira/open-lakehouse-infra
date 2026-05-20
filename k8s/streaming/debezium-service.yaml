@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: debezium
+  namespace: lakehouse
+  labels:
+    app: debezium
+    app.kubernetes.io/part-of: lakehouse-streaming
+spec:
+  selector:
+    app: debezium
+  ports:
+    - name: rest
+      port: 8083
+      targetPort: 8083

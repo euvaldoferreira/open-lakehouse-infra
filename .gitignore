@@ -1,0 +1,41 @@
+# Environment - NEVER commit
+infra/.env
+**/.env
+
+# Volume data
+volumes/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Notebooks exploratórios — análises locais, não vão para produção
+notebooks/exploratory/*.ipynb
+
+# Repositórios separados — gerenciados via setup-repos.sh
+# Não commitar conteúdo destes diretórios no lakehouse-infra
+airflow/dags/
+airflow/plugins/
+notebooks/pipelines/
+notebooks/examples/
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# Logs
+*.log
+logs/
+
+# Temp
+*.tmp
+temp/

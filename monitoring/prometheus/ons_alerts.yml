@@ -1,0 +1,75 @@
+# =============================================================================
+# Prometheus Alert Rules - ONS Energy Domain
+# Reuses the same alerting infrastructure as the platform's alerts.yml.
+# =============================================================================
+
+groups:
+
+  # ---------------------------------------------------------------------------
+  # ONS Pipeline — DAG failures and staleness
+  # Leverages Airflow's native Prometheus metrics endpoint (/metrics).
+  # ---------------------------------------------------------------------------
+  - name: ons_pipeline
+    interval: 60s
+    rules:
+
+      - alert: ONSIngestionFailed
+        expr: >
+          increase(airflow_dag_run_failed_total{dag_id=~"ons_dag.*"}[2h]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          domain: ons
+        annotations:
+          summary: "ONS DAG {{ $labels.dag_id }} falhou"
+          description: >
+            O DAG {{ $labels.dag_id }} registrou {{ $value }} falhas nas últimas
+            2 horas. Verifique os logs do Airflow para detalhes.
+
+      - alert: ONSIngestionHighFailureRate
+        expr: >
+          sum(increase(airflow_dag_run_failed_total{dag_id=~"ons_dag.*"}[6h])) > 3
+        for: 0m
+        labels:
+          severity: critical
+          domain: ons
+        annotations:
+          summary: "Taxa alta de falhas nos DAGs ONS (últimas 6h)"
+          description: >
+            {{ $value }} execuções de DAGs ONS falharam nas últimas 6 horas.
+            Possível problema na API pública do ONS ou nas credenciais MinIO.
+
+      - alert: ONSPipelineStaleness
+        expr: >
+          (time() - airflow_dag_run_last_run_unixtime{dag_id="ons_dag_01_raw_ingestion"}) > 90000
+        for: 5m
+        labels:
+          severity: warning
+          domain: ons
+        annotations:
+          summary: "Ingestão ONS sem execução há mais de 25 horas"
+          description: >
+            O DAG ons_dag_01_raw_ingestion não executou com sucesso nas últimas
+            25 horas. Os dados do painel de energia estão desatualizados.
+
+  # ---------------------------------------------------------------------------
+  # ONS API — disponibilidade da fonte externa
+  # Prometheus blackbox exporter (se configurado) para monitorar o endpoint ONS.
+  # ---------------------------------------------------------------------------
+  - name: ons_source
+    interval: 300s
+    rules:
+
+      - alert: ONSAPIUnavailable
+        expr: >
+          probe_success{job="ons-opendata"} == 0
+        for: 10m
+        labels:
+          severity: warning
+          domain: ons
+        annotations:
+          summary: "API pública do ONS inacessível"
+          description: >
+            O endpoint S3 público do ONS não responde há mais de 10 minutos.
+            As ingestões agendadas falharão até que o serviço seja restaurado.
+            URL: https://ons-aws-prod-opendata.s3-sa-east-1.amazonaws.com/
