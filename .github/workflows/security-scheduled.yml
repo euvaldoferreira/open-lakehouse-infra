@@ -22,6 +22,12 @@ jobs:
       - name: Audit Airflow providers
         run: pip-audit -r airflow/requirements.txt
 
+      - name: Audit Notebook dependencies
+        run: pip-audit -r notebooks/requirements.txt
+
+      - name: Audit Notebook runner dependencies
+        run: pip-audit -r notebooks/runner/requirements.txt
+
       - name: Open issue on failure
         if: failure()
         uses: actions/github-script@v7
