@@ -2,7 +2,7 @@
 # Show platform status
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "${SCRIPT_DIR}/../infra"
+cd "${SCRIPT_DIR}/../infra" || exit 1
 
 COMPOSE_CMD="docker compose"
 

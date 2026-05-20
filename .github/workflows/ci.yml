@@ -73,7 +73,15 @@ jobs:
       - run: pip install -r requirements-ci.txt
 
       - name: Audit Airflow providers
-        run: pip-audit -r airflow/requirements.txt
+        run: |
+          # CVEs ignorados: dependências transitivas do Airflow core (flask, FAB, pyjwt, lxml).
+          # Requerem upgrade do apache-airflow para corrigir — tratados em lakehouse-infra/issues.
+          pip-audit -r airflow/requirements.txt \
+            --ignore-vuln CVE-2025-32962 \
+            --ignore-vuln CVE-2025-58065 \
+            --ignore-vuln CVE-2026-27205 \
+            --ignore-vuln PYSEC-2025-183 \
+            --ignore-vuln PYSEC-2026-87
 
       - name: Audit Notebook dependencies
         run: pip-audit -r notebooks/requirements.txt
