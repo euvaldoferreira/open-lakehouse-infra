@@ -264,6 +264,9 @@ services:
       SPARK_WORKER_WEBUI_PORT: 8082
       AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
       AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      SPARK_LOCAL_DIRS: /spark-local
+    volumes:
+      - spark_local_dir:/spark-local
     depends_on:
       spark-master:
         condition: service_healthy
@@ -283,6 +286,7 @@ services:
     env_file: .env
     environment:
       JUPYTER_TOKEN: ${JUPYTER_TOKEN}
+      JUPYTER_PASSWORD: ${JUPYTER_PASSWORD}
       MINIO_ENDPOINT: ${MINIO_ENDPOINT}
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
@@ -301,6 +305,8 @@ services:
       - ../notebooks/exploratory:/home/jovyan/work/exploratory:rw
       - notebooks_output:/home/jovyan/output
       - jupyter_data:/home/jovyan/.local
+      - ../notebooks/jupyter_server_config.py:/etc/jupyter/jupyter_server_config.py:ro
+      - spark_local_dir:/spark-local
     ports:
       - "${JUPYTER_PORT:-8888}:8888"
     networks:
@@ -774,3 +780,5 @@ volumes:
     name: lakehouse_superset_home
   runner_db:
     name: lakehouse_runner_db
+  spark_local_dir:
+    name: lakehouse_spark_local_dir
