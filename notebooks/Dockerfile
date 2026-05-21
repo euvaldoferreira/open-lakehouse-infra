@@ -19,7 +19,8 @@ COPY entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 COPY requirements.txt /tmp/notebook-requirements.txt
-RUN /opt/conda/bin/pip install --no-cache-dir -r /tmp/notebook-requirements.txt
+RUN /opt/conda/bin/pip install --no-cache-dir -r /tmp/notebook-requirements.txt && \
+    /opt/conda/bin/pip install --no-cache-dir --force-reinstall jupyterlab-git==0.53.0
 
 # Install internal Lakehouse utilities (abstracts credentials/config from notebooks)
 COPY lakehouse_pkg /tmp/lakehouse_pkg

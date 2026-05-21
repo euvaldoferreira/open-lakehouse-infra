@@ -27,6 +27,7 @@ def get_spark(app_name: str = "LakehouseNotebook", shuffle_partitions: int = 4) 
         .config("spark.hadoop.fs.s3a.impl",
                 "org.apache.hadoop.fs.s3a.S3AFileSystem")
         .config("spark.sql.shuffle.partitions", str(shuffle_partitions))
+        .config("spark.local.dir", "/spark-local")
         .getOrCreate()
     )
 
