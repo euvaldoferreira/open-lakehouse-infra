@@ -257,16 +257,14 @@ services:
   spark-worker:
     <<: *spark-common
     container_name: lakehouse-spark-worker
-    command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.worker.Worker", "spark://spark-master:7077"]
+    command: ["bash", "-c", "mkdir -p /tmp/spark-local && /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077"]
     environment:
       SPARK_WORKER_MEMORY: ${SPARK_WORKER_MEMORY}
       SPARK_WORKER_CORES: ${SPARK_WORKER_CORES}
       SPARK_WORKER_WEBUI_PORT: 8082
       AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
       AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
-      SPARK_LOCAL_DIRS: /spark-local
-    volumes:
-      - spark_local_dir:/spark-local
+      SPARK_LOCAL_DIRS: /tmp/spark-local
     depends_on:
       spark-master:
         condition: service_healthy
@@ -306,7 +304,6 @@ services:
       - notebooks_output:/home/jovyan/output
       - jupyter_data:/home/jovyan/.local
       - ../notebooks/jupyter_server_config.py:/etc/jupyter/jupyter_server_config.py:ro
-      - spark_local_dir:/spark-local
     ports:
       - "${JUPYTER_PORT:-8888}:8888"
     networks:
@@ -780,5 +777,3 @@ volumes:
     name: lakehouse_superset_home
   runner_db:
     name: lakehouse_runner_db
-  spark_local_dir:
-    name: lakehouse_spark_local_dir
