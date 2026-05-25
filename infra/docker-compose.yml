@@ -18,14 +18,15 @@ x-airflow-common: &airflow-common
     AIRFLOW__LOGGING__REMOTE_LOGGING: "false"
     AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: 30
     AIRFLOW__SCHEDULER__MIN_FILE_PROCESS_INTERVAL: 30
+    AIRFLOW__CORE__DAGS_FOLDER: /git/repo/dags
+    AIRFLOW__CORE__PLUGINS_FOLDER: /git/repo/plugins
     MINIO_ENDPOINT: ${MINIO_ENDPOINT}
     MINIO_ROOT_USER: ${MINIO_ROOT_USER}
     MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     SPARK_MASTER_URL: spark://spark-master:7077
     NOTEBOOK_RUNNER_URL: http://notebook-runner:8000
   volumes:
-    - ${PIPELINES_REPO}/dags:/opt/airflow/dags:ro
-    - ${PIPELINES_REPO}/plugins:/opt/airflow/plugins:ro
+    - pipelines_sync:/git:ro
     - airflow_logs:/opt/airflow/logs
   networks:
     - backend_network
@@ -146,6 +147,27 @@ services:
     networks:
       - backend_network
     restart: on-failure
+
+  # ---------------------------------------------------------------------------
+  # GIT-SYNC - Sincroniza DAGs do GitHub → volume compartilhado com Airflow
+  # ---------------------------------------------------------------------------
+  git-sync:
+    image: registry.k8s.io/git-sync/git-sync:v4.2.1
+    container_name: lakehouse-git-sync
+    environment:
+      GITSYNC_REPO: https://github.com/euvaldoferreira/open-lakehouse-pipelines.git
+      GITSYNC_REF: main
+      GITSYNC_ROOT: /git
+      GITSYNC_LINK: repo
+      GITSYNC_PERIOD: 60s
+      GITSYNC_DEPTH: "1"
+      GITSYNC_USERNAME: euvaldoferreira
+      GITSYNC_PASSWORD: ${GITHUB_TOKEN}
+    volumes:
+      - pipelines_sync:/git
+    networks:
+      - backend_network
+    restart: unless-stopped
 
   # ---------------------------------------------------------------------------
   # AIRFLOW - Init DB
@@ -755,6 +777,8 @@ networks:
 # =============================================================================
 
 volumes:
+  pipelines_sync:
+    name: lakehouse_pipelines_sync
   postgres_data:
     name: lakehouse_postgres_data
   minio_data:
