@@ -1,5 +1,5 @@
 papermill==2.7.0
-boto3==1.43.12
+boto3==1.43.14
 minio==7.2.20
 pandas==2.3.3
 pyarrow==24.0.0
