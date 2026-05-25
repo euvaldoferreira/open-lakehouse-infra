@@ -5,7 +5,7 @@ apache-airflow-providers-postgres==5.10.2
 apache-airflow-providers-http==4.13.3
 apache-airflow-providers-common-io==1.7.2
 pyspark==3.5.2
-boto3==1.43.12
+boto3==1.43.14
 minio==7.2.20
 pandas==2.3.3
 pyarrow==24.0.0
