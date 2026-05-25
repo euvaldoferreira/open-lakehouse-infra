@@ -10,5 +10,5 @@ ipywidgets==8.1.8
 jupyterlab-git==0.53.0
 nbstripout==0.9.1
 great-expectations==0.18.15
-psycopg2-binary==2.9.9
+psycopg2-binary==2.9.12
 sqlalchemy==2.0.49
