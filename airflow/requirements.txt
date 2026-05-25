@@ -1,7 +1,7 @@
 apache-airflow-providers-apache-spark==4.7.1
 apache-airflow-providers-ssh==3.11.0
 apache-airflow-providers-amazon==8.19.0
-apache-airflow-providers-postgres==5.10.2
+apache-airflow-providers-postgres==5.14.0
 apache-airflow-providers-http==4.13.3
 apache-airflow-providers-common-io==1.7.2
 pyspark==3.5.2
